@@ -453,6 +453,13 @@ def create_new_epg(args, original_epg_filename, m3u_entries):
         new_root.set("generator-info-name", "py-m3u-epg-editor")
         new_root.set("generator-info-url", "py-m3u-epg-editor")
 
+        for channel in original_root.findall('channel'):
+            channel_display_name = str(channel.find('display-name').text)
+            channel_id = channel.get("id")
+            if any(x.tvg_name == channel_display_name for x in m3u_entries):
+                output_str("Updating channel element for {}".format(channel_display_name))
+                x.tvg_id = channel_id
+
         # create a channel element for every channel present in the m3u
         for channel in original_root.iter('channel'):
             channel_id = channel.get("id")
@@ -489,6 +496,7 @@ def create_new_epg(args, original_epg_filename, m3u_entries):
                                     new_elem.set(attr_key, attr_val)
                 else:
                     no_epg_channels.append(entry)
+
             else:
                 no_epg_channels.append(entry)
 
