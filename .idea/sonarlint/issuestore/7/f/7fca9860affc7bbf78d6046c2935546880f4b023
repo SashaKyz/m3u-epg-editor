@@ -1,0 +1,9 @@
+
+5python:S1110" Remove those useless parentheses(–Ü³Q
+6python:S1110" Remove those useless parentheses(•Íİ£
+mpython:S3776"RRefactor this method to reduce its Cognitive Complexity from 17 to the 15 allowed.(š³Åúÿÿÿÿ
+mpython:S3776"RRefactor this method to reduce its Cognitive Complexity from 49 to the 15 allowed.(é­Ë¹ÿÿÿÿÿ
+wpython:S134"]Refactor this code to not nest more than 4 "if", "for", "while", "try" and "with" statements.(Æ•ñÔøÿÿÿÿ
+wpython:S134"]Refactor this code to not nest more than 4 "if", "for", "while", "try" and "with" statements.(øÜ‹îûÿÿÿÿ
+wpython:S134"]Refactor this code to not nest more than 4 "if", "for", "while", "try" and "with" statements.(ÁÈ—Œûÿÿÿÿ
+Qpython:PrintStatementUsage"-Replace print statement by built-in function.(îÀ

@@ -54,8 +54,7 @@ class M3uItem:
 
     def is_valid(self):
         return self.tvg_name is not None and self.tvg_name != "" and \
-               self.tvg_id is not None and self.tvg_id != "" and \
-               self.group_title is not None and self.group_title != ""
+               self.url is not None and self.url != ""
 
 
 class FileUriAdapter(requests.adapters.BaseAdapter):
@@ -129,7 +128,7 @@ def main():
     args = validate_args()
 
     m3u_entries = load_m3u(args)
-    m3u_entries = filter_m3u_entries(args, m3u_entries)
+#    m3u_entries = filter_m3u_entries(args, m3u_entries)
 
     if m3u_entries is not None and len(m3u_entries) > 0:
         m3u_entries = sort_m3u_entries(args, m3u_entries)
@@ -264,8 +263,10 @@ def parse_m3u(m3u_filename):
     for line in m3u_file:
         line = line.strip()
         if line.startswith('#EXTINF:'):
-            m3u_fields = line.split('#EXTINF:-1 ')[1]
-            entry = M3uItem(m3u_fields)
+            entry = M3uItem(None)
+            entry.tvg_name = line[8:].split(',')[1]
+        elif line.startswith('#EXTGRP:'):
+            entry.group_title = line[8:]
         elif len(line) != 0:
             entry.url = line
             if M3uItem.is_valid(entry):
