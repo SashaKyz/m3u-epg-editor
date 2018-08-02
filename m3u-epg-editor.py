@@ -27,6 +27,7 @@ import shutil
 import gzip
 from xml.etree.cElementTree import Element, SubElement, parse, ElementTree
 import datetime
+import unicodedata
 import dateutil.parser
 from urllib import url2pathname
 
