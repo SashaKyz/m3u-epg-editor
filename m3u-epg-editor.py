@@ -1,22 +1,3 @@
-"""
-This a python m3u / epg file optimizer script
-This script enables download of m3u / epg files from a remote web server and introduces features to trim / optimize
-these files to a set of wanted channel groups and channels along with the ability to sort / reorder channels
-
-This can prove useful on underpowered devices where SPMC / KODI / some other app running on that device might struggle
-to load a very large m3u / epg file
-
-This script has been tested with:
-
-1. vaderstreams m3u and epg files pulled from:
-    http://<VADERSTREAMS_DOMAIN>/epg/vget?username=<USERNAME>&password=<PASSWORD>
-    http://<VADERSTREAMS_DOMAIN>/p2.xml.gz
-
-2. fab m3u and epg files pulled from:
-    http://<FAB_DOMAIN>/get.php?username=<USERNAME>&password=<PASSWORD>&type=m3u_plus&output=ts
-    http://<FAB_DOMAIN>/xmltv.php?username=<USERNAME>&password=<PASSWORD>
-"""
-
 import sys
 import os
 import argparse
@@ -28,7 +9,9 @@ import gzip
 from xml.etree.cElementTree import Element, SubElement, parse, ElementTree
 import datetime
 import unicodedata
+from fuzzywuzzy import fuzz
 import dateutil.parser
+import codecs
 from urllib import url2pathname
 
 
@@ -265,11 +248,11 @@ def parse_m3u(m3u_filename):
         line = line.strip()
         if line.startswith('#EXTINF:'):
             entry = M3uItem(None)
-            entry.tvg_name = line[8:].split(',')[1]
+            entry.tvg_name = line[8:].split(',')[1].decode('utf-8','ignore')
         elif line.startswith('#EXTGRP:'):
-            entry.group_title = line[8:]
+            entry.group_title = line[8:].decode('utf-8','ignore')
         elif len(line) != 0:
-            entry.url = line
+            entry.url = line.decode('utf-8','ignore')
             if M3uItem.is_valid(entry):
                 m3u_entries.append(entry)
             entry = M3uItem(None)
@@ -338,7 +321,7 @@ def save_new_m3u(args, m3u_entries):
         idx = 0
         m3u_target = os.path.join(args.outdirectory, args.outfilename + ".m3u8")
         output_str("saving new m3u file: " + m3u_target)
-        with open(m3u_target, "w") as text_file:
+        with codecs.open(m3u_target, "w",encoding="utf-8") as text_file:
             text_file.write("%s\n" % "#EXTM3U")
             group_title = m3u_entries[0].group_title
 
@@ -445,75 +428,78 @@ def is_in_range(args, programme):
 # creates a new epg from the epg represented by original_epg_filename using the given m3u_entries as a template
 def create_new_epg(args, original_epg_filename, m3u_entries):
     output_str("creating new xml epg for {} m3u items".format(len(m3u_entries)))
-    try:
-        original_tree = parse(original_epg_filename)
-        original_root = original_tree.getroot()
+   # try:
+    original_tree = parse(original_epg_filename)
+    original_root = original_tree.getroot()
 
-        new_root = Element("tv")
-        new_root.set("source-info-name", "py-m3u-epg-editor")
-        new_root.set("generator-info-name", "py-m3u-epg-editor")
-        new_root.set("generator-info-url", "py-m3u-epg-editor")
+    new_root = Element("tv")
+    new_root.set("source-info-name", "py-m3u-epg-editor")
+    new_root.set("generator-info-name", "py-m3u-epg-editor")
+    new_root.set("generator-info-url", "py-m3u-epg-editor")
 
-        for channel in original_root.findall('channel'):
-            channel_display_name = str(channel.find('display-name').text)
-            channel_id = channel.get("id")
-            if any(x.tvg_name == channel_display_name for x in m3u_entries):
-                output_str("Updating channel element for {}".format(channel_display_name))
-                x.tvg_id = channel_id
+    for channel in original_root.findall('channel'):  # type: object
+        channel_display_name = channel.find('display-name').text
+        channel_id = channel.get("id")
+        for x in m3u_entries :
+            ratio_fuzz = fuzz.ratio(x.tvg_name, channel_display_name)
+            if  ( ratio_fuzz > 97):
+                #output_str("Updating channel element for {}".format(channel_display_name).encode('utf-8'))
+                x.tvg_id = channel_id.decode('utf-8')
+                break
 
-        # create a channel element for every channel present in the m3u
-        for channel in original_root.iter('channel'):
-            channel_id = channel.get("id")
-            if any(x.tvg_id == channel_id for x in m3u_entries):
-                output_str("creating channel element for {}".format(channel_id))
-                new_channel = SubElement(new_root, "channel")
-                new_channel.set("id", channel_id)
-                for elem in channel:
-                    new_elem = SubElement(new_channel, elem.tag)
-                    new_elem.text = elem.text
-                    for attr_key in elem.keys():
-                        attr_val = elem.get(attr_key)
-                        new_elem.set(attr_key, attr_val)
+    # create a channel element for every channel present in the m3u
+    for channel in original_root.iter('channel'):
+        channel_id = channel.get("id")
+        if any((fuzz.ratio (x.tvg_id,channel_id)>97) for x in m3u_entries):
+            output_str("creating channel element for {}".format(channel_id))
+            new_channel = SubElement(new_root, "channel")
+            new_channel.set("id", channel_id)
+            for elem in channel:
+                new_elem = SubElement(new_channel, elem.tag)
+                new_elem.text = elem.text
+                for attr_key in elem.keys():
+                    attr_val = elem.get(attr_key)
+                    new_elem.set(attr_key, attr_val)
 
-        # now copy all programme elements from the original epg for every channel present in the m3u
-        no_epg_channels = []
-        for entry in m3u_entries:
-            if entry.tvg_id is not None and entry.tvg_id != "" and entry.tvg_id != "None":
-                output_str("creating programme elements for {}".format(entry.tvg_name))
-                channel_xpath = 'programme[@channel="' + entry.tvg_id + '"]'
-                channel_programmes = original_tree.findall(channel_xpath)
-                if len(channel_programmes) > 0:
-                    for elem in channel_programmes:
-                        if is_in_range(args, elem):
-                            programme = SubElement(new_root, elem.tag)
-                            for attr_key in elem.keys():
-                                attr_val = elem.get(attr_key)
-                                programme.set(attr_key, attr_val)
-                            for sub_elem in elem:
-                                new_elem = SubElement(programme, sub_elem.tag)
-                                new_elem.text = sub_elem.text
-                                for attr_key in sub_elem.keys():
-                                    attr_val = sub_elem.get(attr_key)
-                                    new_elem.set(attr_key, attr_val)
-                else:
-                    no_epg_channels.append(entry)
-
+    # now copy all programme elements from the original epg for every channel present in the m3u
+    no_epg_channels = []
+    for entry in m3u_entries:
+        if entry.tvg_id is not None and entry.tvg_id != "" and entry.tvg_id != "None":
+            output_str("creating programme elements for {}".format(entry.tvg_name))
+            channel_xpath = 'programme[@channel="' + entry.tvg_id + '"]'
+            channel_programmes = original_tree.findall(channel_xpath)
+            if len(channel_programmes) > 0:
+                for elem in channel_programmes:
+                    if is_in_range(args, elem):
+                        programme = SubElement(new_root, elem.tag)
+                        for attr_key in elem.keys():
+                            attr_val = elem.get(attr_key)
+                            programme.set(attr_key, attr_val)
+                        for sub_elem in elem:
+                            new_elem = SubElement(programme, sub_elem.tag)
+                            new_elem.text = sub_elem.text
+                            for attr_key in sub_elem.keys():
+                                attr_val = sub_elem.get(attr_key)
+                                new_elem.set(attr_key, attr_val)
             else:
                 no_epg_channels.append(entry)
 
-        indent(new_root)
-        tree = ElementTree(new_root)
+        else:
+            no_epg_channels.append(entry)
 
-        if len(no_epg_channels) > 0:
-            save_no_epg_channels(args, no_epg_channels)
+    indent(new_root)
+    tree = ElementTree(new_root)
 
-        return tree
-    except:
+    if len(no_epg_channels) > 0:
+        save_no_epg_channels(args, no_epg_channels)
+
+    return tree
+#   except:
         # likely a mangled xml parse exception
-        e = sys.exc_info()[0]
-        output_str("epg creation failure: {0}".format(e))
-        return None
-
+ #       e = sys.exc_info()[0]
+ #       output_str("epg creation failure: {0}".format(e))
+  #      return None
+#
 
 # saves the no_epg_channels list into the file system
 def save_no_epg_channels(args, no_epg_channels):
