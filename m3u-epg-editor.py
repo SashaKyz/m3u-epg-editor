@@ -37,7 +37,7 @@ class M3uItem:
                 output_str("m3u file parse AttributeError: {0}".format(e))
 
     def is_valid(self):
-        return self.tvg_name is not None and self.tvg_name != "" and \
+        return self.name is not None and self.name != "" and \
                self.url is not None and self.url != ""
 
 
@@ -117,13 +117,13 @@ def main():
     if m3u_entries is not None and len(m3u_entries) > 0:
         m3u_entries = sort_m3u_entries(args, m3u_entries)
 
-        save_new_m3u(args, m3u_entries)
-
         epg_filename = load_epg(args)
         if epg_filename is not None:
             xml_tree = create_new_epg(args, epg_filename, m3u_entries)
             if xml_tree is not None:
                 save_new_epg(args, xml_tree)
+
+        save_new_m3u(args, m3u_entries)
 
 
 # parses and validates cli arguments passed to this script
@@ -248,7 +248,7 @@ def parse_m3u(m3u_filename):
         line = line.strip()
         if line.startswith('#EXTINF:'):
             entry = M3uItem(None)
-            entry.tvg_name = line[8:].split(',')[1].decode('utf-8','ignore')
+            entry.name = line[8:].split(',')[1].decode('utf-8','ignore')
         elif line.startswith('#EXTGRP:'):
             entry.group_title = line[8:].decode('utf-8','ignore')
         elif len(line) != 0:
@@ -441,10 +441,11 @@ def create_new_epg(args, original_epg_filename, m3u_entries):
         channel_display_name = channel.find('display-name').text
         channel_id = channel.get("id")
         for x in m3u_entries :
-            ratio_fuzz = fuzz.ratio(x.tvg_name, channel_display_name)
+            ratio_fuzz = fuzz.ratio(x.name, channel_display_name)
             if  ( ratio_fuzz > 97):
                 #output_str("Updating channel element for {}".format(channel_display_name).encode('utf-8'))
                 x.tvg_id = channel_id.decode('utf-8')
+                x.tvg_name = channel_display_name
                 break
 
     # create a channel element for every channel present in the m3u
@@ -465,7 +466,7 @@ def create_new_epg(args, original_epg_filename, m3u_entries):
     no_epg_channels = []
     for entry in m3u_entries:
         if entry.tvg_id is not None and entry.tvg_id != "" and entry.tvg_id != "None":
-            output_str("creating programme elements for {}".format(entry.tvg_name))
+            #output_str("creating programme elements for {}".format(entry.tvg_name))
             channel_xpath = 'programme[@channel="' + entry.tvg_id + '"]'
             channel_programmes = original_tree.findall(channel_xpath)
             if len(channel_programmes) > 0:
@@ -504,9 +505,9 @@ def create_new_epg(args, original_epg_filename, m3u_entries):
 # saves the no_epg_channels list into the file system
 def save_no_epg_channels(args, no_epg_channels):
     no_epg_channels_target = os.path.join(args.outdirectory, "no_epg_channels.txt")
-    with open(no_epg_channels_target, "w") as no_epg_channels_file:
+    with codecs.open(no_epg_channels_target, "w",encoding="utf-8") as no_epg_channels_file:
         for m3u_entry in no_epg_channels:
-            no_epg_channels_file.write("'%s','%s'\n" % (m3u_entry.tvg_name.lower(), m3u_entry.tvg_id))
+            no_epg_channels_file.write("'%s','%s'\n" % (m3u_entry.name.lower(), m3u_entry.tvg_id))
 
 
 # saves the epg xml document represented by xml_tree into the file system
