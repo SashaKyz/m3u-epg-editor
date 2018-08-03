@@ -1,4 +1,5 @@
 *.m3u*
 *.txt
+build/*
 *.gz
 *.sh
