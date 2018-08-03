@@ -442,11 +442,10 @@ def create_new_epg(args, original_epg_filename, m3u_entries):
         channel_id = channel.get("id")
         for x in m3u_entries :
             ratio_fuzz = fuzz.ratio(x.name, channel_display_name)
-            if  ( ratio_fuzz > 97):
+            if  ( ratio_fuzz > 95):
                 #output_str("Updating channel element for {}".format(channel_display_name).encode('utf-8'))
                 x.tvg_id = channel_id.decode('utf-8')
                 x.tvg_name = channel_display_name
-                break
 
     # create a channel element for every channel present in the m3u
     for channel in original_root.iter('channel'):
