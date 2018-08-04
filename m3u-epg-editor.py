@@ -382,7 +382,8 @@ def save_original_epg(is_gzipped, out_directory, epg_response):
     with open(epg_target, "wb") if not isinstance(epg_response.raw, gzip.GzipFile) else gzip.open(epg_target,
                                                                                                   "wb") as epg_file:
         if not isinstance(epg_response.raw, gzip.GzipFile):
-            epg_response.raw.decode_content = True
+            if hasattr(epg_response.raw, 'decode_content'):
+                epg_response.raw.decode_content = True
             shutil.copyfileobj(epg_response.raw, epg_file)
         else:
             epg_file.write(epg_response.content)
@@ -444,14 +445,18 @@ def create_new_epg(args, original_epg_filename, m3u_entries):
             ratio_fuzz = fuzz.ratio(x.name, channel_display_name)
             if  ( ratio_fuzz > 95):
                 #output_str("Updating channel element for {}".format(channel_display_name).encode('utf-8'))
-                x.tvg_id = channel_id.decode('utf-8')
+                if isinstance(channel_id,unicode):
+                    x.tvg_id = channel_id
+                else:
+                    x.tvg_id = channel_id.decode('utf-8')
+
                 x.tvg_name = channel_display_name
 
     # create a channel element for every channel present in the m3u
     for channel in original_root.iter('channel'):
         channel_id = channel.get("id")
         if any((fuzz.ratio (x.tvg_id,channel_id)>97) for x in m3u_entries):
-            output_str("creating channel element for {}".format(channel_id))
+            #output_str("creating channel element for {}".format(channel_id))
             new_channel = SubElement(new_root, "channel")
             new_channel.set("id", channel_id)
             for elem in channel:
