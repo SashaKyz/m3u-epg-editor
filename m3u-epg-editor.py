@@ -313,11 +313,11 @@ def filter_m3u_entries(args, m3u_entries):
 # filters the given m3u_entries using the supplied groups
 def fillfree_m3u_entries(m3u_entries):
     for m3u_entry in m3u_entries:
-        if m3u_entry.group_title == None:
-            if re.search('UA', m3u_entry): m3u_entry.group_title = u'UA'
-            if re.search('^US:', m3u_entry): m3u_entry.group_title = u'US'
-            if re.search('^USA:', m3u_entry): m3u_entry.group_title = u'US'
-            if re.search('^UK:', m3u_entry): m3u_entry.group_title = u'UK'
+        if (m3u_entry.group_title == None) and (m3u_entry.name != None):
+            if re.search('UA', m3u_entry.name): m3u_entry.group_title = u'UA'
+            elif re.search('^US:', m3u_entry.name): m3u_entry.group_title = u'US'
+            elif re.search('^USA:', m3u_entry.name): m3u_entry.group_title = u'US'
+            elif re.search('^UK:', m3u_entry.name): m3u_entry.group_title = u'UK'
 
     output_str("filled m3u contains {} items".format(len(m3u_entries)))
     return m3u_entries
