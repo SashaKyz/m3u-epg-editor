@@ -3,6 +3,7 @@ import os
 import argparse
 import ast
 import requests
+import itertools
 import re
 import shutil
 import gzip
@@ -13,7 +14,29 @@ from fuzzywuzzy import fuzz
 import dateutil.parser
 import codecs
 from urllib import url2pathname
+import urllib2
 
+
+class check_link():
+
+    def __init__(self, address,timeout_check):
+        self.address = address
+        self.timeout_check=timeout_check if timeout_check is not None else 0.3
+
+    def check(self, address):
+        try:
+
+            request = requests.get(url=address,timeout=self.timeout_check, stream=True)
+            if request.status_code in [400, 404, 403, 408, 409, 501, 502, 503]:
+                return  False
+            elif request.status_code == requests.codes.ok:
+                return True
+            else:
+                print ("{}-{}".format(e, address))
+                pass
+        except Exception as e:
+            print ("{}-{}".format(e, address))
+            return False
 
 class M3uItem:
     def __init__(self, m3u_fields):
@@ -28,18 +51,20 @@ class M3uItem:
 
         if m3u_fields is not None:
             try:
-                self.tvg_name = re.search('tvg-name="(.*?)"', m3u_fields, re.IGNORECASE).group(1)
-                self.tvg_id = re.search('tvg-id="(.*?)"', m3u_fields, re.IGNORECASE).group(1)
-                self.tvg_logo = re.search('tvg-logo="(.*?)"', m3u_fields, re.IGNORECASE).group(1)
-                self.group_title = re.search('group-title="(.*?)"', m3u_fields, re.IGNORECASE).group(1)
-                self.name = m3u_fields.split("\",")[1]
+                if re.search('tvg-name="(.*?)"', m3u_fields, re.IGNORECASE): self.tvg_name = re.search('tvg-name="(.*?)"', m3u_fields, re.IGNORECASE).group(1)
+                if (re.search('tvg-id="(.*?)"', m3u_fields, re.IGNORECASE)) and (re.search('tvg-id="(.*?)"', m3u_fields, re.IGNORECASE).group(1) != u'EPG N/A'):
+                    self.tvg_id = re.search('tvg-id="(.*?)"', m3u_fields, re.IGNORECASE).group(1)
+                if (re.search('tvg-logo="(.*?)"', m3u_fields, re.IGNORECASE)) and (re.search('tvg-logo="(.*?)"', m3u_fields, re.IGNORECASE).group(1) != u'Logo N/A'):
+                    self.tvg_logo = re.search('tvg-logo="(.*?)"', m3u_fields, re.IGNORECASE).group(1)
+                if (re.search('group-title="(.*?)"', m3u_fields, re.IGNORECASE)):
+                    self.group_title = re.search('group-title="(.*?)"', m3u_fields, re.IGNORECASE).group(1)
+                self.name = m3u_fields.split(",")[-1]
             except AttributeError as e:
                 output_str("m3u file parse AttributeError: {0}".format(e))
 
     def is_valid(self):
         return self.name is not None and self.name != "" and \
                self.url is not None and self.url != ""
-
 
 class FileUriAdapter(requests.adapters.BaseAdapter):
 
@@ -88,7 +113,6 @@ class FileUriAdapter(requests.adapters.BaseAdapter):
     def close(self):
         pass
 
-
 arg_parser = argparse.ArgumentParser(
     description='download and optimize m3u/epg files retrieved from a remote web server',
     formatter_class=argparse.RawTextHelpFormatter)
@@ -110,9 +134,8 @@ arg_parser.add_argument('--outfilename', '-f', nargs='?', help='The output filen
 # main entry point
 def main():
     args = validate_args()
-
     m3u_entries = load_m3u(args)
-#    m3u_entries = filter_m3u_entries(args, m3u_entries)
+    m3u_entries = filter_m3u_entries(args, m3u_entries)
 
     if m3u_entries is not None and len(m3u_entries) > 0:
         m3u_entries = sort_m3u_entries(args, m3u_entries)
@@ -179,12 +202,10 @@ def validate_args():
 
     return args
 
-
 # controlled script abort mechanism
 def abort_process(reason, exitcode):
     output_str(reason)
     sys.exit(exitcode)
-
 
 # helper print function with timestamp
 def output_str(event_str):
@@ -209,7 +230,6 @@ def load_m3u(args):
     else:
         m3u_response.close()
 
-
 # performs the HTTP GET
 def get_m3u(m3u_url):
     output_str("performing HTTP GET request to " + m3u_url)
@@ -223,7 +243,6 @@ def get_m3u(m3u_url):
 
     return response
 
-
 # saves the HTTP GET response to the file system
 def save_original_m3u(out_directory, m3u_response):
     m3u_target = os.path.join(out_directory, "original.m3u8")
@@ -231,7 +250,6 @@ def save_original_m3u(out_directory, m3u_response):
     with open(m3u_target, "w") as text_file:
         text_file.write(m3u_response.content)
         return m3u_target
-
 
 # parses the m3u file represented by m3u_filename into a list of M3uItem objects and returns them
 def parse_m3u(m3u_filename):
@@ -247,8 +265,8 @@ def parse_m3u(m3u_filename):
     for line in m3u_file:
         line = line.strip()
         if line.startswith('#EXTINF:'):
-            entry = M3uItem(None)
-            entry.name = line[8:].split(',')[1].decode('utf-8','ignore')
+            entry = M3uItem(line[11:].decode('utf-8','ignore'))
+            #entry.name = line[8:].split(',')[1].decode('utf-8','ignore')
         elif line.startswith('#EXTGRP:'):
             entry.group_title = line[8:].decode('utf-8','ignore')
         elif len(line) != 0:
@@ -261,6 +279,13 @@ def parse_m3u(m3u_filename):
     output_str("m3u contains {} items".format(len(m3u_entries)))
     return m3u_entries
 
+def check_url_connect(url):
+    #output_str("Check URL for \"died\" link: "+url)
+    newcheck = check_link(url,None)
+    return newcheck.check(url)
+
+def my_sort(seq):
+    return list(k for k, _ in itertools.groupby(sorted(seq, key=lambda entry: entry.url)))
 
 # filters the given m3u_entries using the supplied groups
 def filter_m3u_entries(args, m3u_entries):
@@ -269,19 +294,20 @@ def filter_m3u_entries(args, m3u_entries):
         output_str("ignoring channels in this {}".format(str(args.channels)))
 
     # sort the channels by name by default
-    m3u_entries = sorted(m3u_entries, key=lambda entry: entry.tvg_name)
+    m3u_entries = my_sort(m3u_entries)
 
     filtered_m3u_entries = []
     all_channels_name_target = os.path.join(args.outdirectory, "original.channels.txt")
     filtered_channels_name_target = os.path.join(args.outdirectory, args.outfilename + ".channels.txt")
-    with open(all_channels_name_target, "w") as all_channels_file:
-        with open(filtered_channels_name_target, "w") as filtered_channels_file:
+    with codecs.open(all_channels_name_target, "w",encoding="utf-8") as all_channels_file:
+        with codecs.open(filtered_channels_name_target, "w",encoding="utf-8") as filtered_channels_file:
             for m3u_entry in m3u_entries:
-                if m3u_entry.group_title.lower() in args.groups and not m3u_entry.tvg_name.lower() in args.channels:
+#                if m3u_entry.group_title.lower() in args.groups and not m3u_entry.tvg_name.lower() in args.channels:
+                if check_url_connect(m3u_entry.url):
                     filtered_m3u_entries.append(m3u_entry)
                     filtered_channels_file.write(
-                        "'%s','%s'\n" % (m3u_entry.tvg_name.lower(), m3u_entry.group_title.lower()))
-                all_channels_file.write("'%s','%s'\n" % (m3u_entry.tvg_name.lower(), m3u_entry.group_title.lower()))
+                        "'%s','%s'\n" % (m3u_entry.name, m3u_entry.group_title))
+                all_channels_file.write("'%s','%s'\n" % (m3u_entry.name, m3u_entry.group_title))
 
     output_str("filtered m3u contains {} items".format(len(filtered_m3u_entries)))
     return filtered_m3u_entries
@@ -314,7 +340,6 @@ def sort_m3u_entries(args, m3u_entries):
 
     return m3u_entries
 
-
 # saves the given m3u_entries into the file system
 def save_new_m3u(args, m3u_entries):
     if m3u_entries is not None:
@@ -342,7 +367,6 @@ def save_new_m3u(args, m3u_entries):
 
                 text_file.write('%s\n' % entry.url)
 
-
 ########################################################################################################################
 # epg functions
 ########################################################################################################################
@@ -359,7 +383,6 @@ def load_epg(args):
     else:
         epg_response.close()
 
-
 # performs the HTTP GET
 def get_epg(epg_url):
     output_str("performing HTTP GET request to " + epg_url)
@@ -372,7 +395,6 @@ def get_epg(epg_url):
         response = requests.get(epg_url, stream=True)
 
     return response
-
 
 # saves the HTTP GET response to the file system
 def save_original_epg(is_gzipped, out_directory, epg_response):
@@ -390,7 +412,6 @@ def save_original_epg(is_gzipped, out_directory, epg_response):
 
     return epg_target
 
-
 # extracts the given epg_filename and saves it to the file system
 def extract_original_epg(out_directory, epg_filename):
     epg_target = os.path.join(out_directory, "original.xml")
@@ -398,7 +419,6 @@ def extract_original_epg(out_directory, epg_filename):
     with gzip.open(epg_filename, 'rb') as f_in, open(epg_target, 'wb') as f_out:
         shutil.copyfileobj(f_in, f_out)
         return epg_target
-
 
 # pretty prints the xml document represented by root_elem
 def indent(root_elem, level=0):
@@ -416,7 +436,6 @@ def indent(root_elem, level=0):
         if level and (not root_elem.tail or not root_elem.tail.strip()):
             root_elem.tail = i
 
-
 # returns an indicator whether the given programme in within the configured range window
 def is_in_range(args, programme):
     programme_start = dateutil.parser.parse(programme.get("start"))
@@ -424,7 +443,6 @@ def is_in_range(args, programme):
     range_start = now - datetime.timedelta(hours=args.range)
     range_end = now + datetime.timedelta(hours=args.range)
     return range_start <= programme_start <= range_end
-
 
 # creates a new epg from the epg represented by original_epg_filename using the given m3u_entries as a template
 def create_new_epg(args, original_epg_filename, m3u_entries):
@@ -442,9 +460,10 @@ def create_new_epg(args, original_epg_filename, m3u_entries):
         channel_display_name = channel.find('display-name').text
         channel_id = channel.get("id")
         for x in m3u_entries :
-            ratio_fuzz = fuzz.ratio(x.name, channel_display_name)
-            if  ( ratio_fuzz > 95):
+            ratio_fuzz = fuzz.partial_token_sort_ratio(x.name, channel_display_name,force_ascii=False)
+            if  ( ratio_fuzz > 97):
                 #output_str("Updating channel element for {}".format(channel_display_name).encode('utf-8'))
+
                 if isinstance(channel_id,unicode):
                     x.tvg_id = channel_id
                 else:
