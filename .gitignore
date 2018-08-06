@@ -1,5 +1,6 @@
 *.m3u*
 *.txt
 build/*
+.idea/*
 *.gz
 *.sh

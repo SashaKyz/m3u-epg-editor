@@ -31,11 +31,7 @@ class check_link():
                 return  False
             elif request.status_code == requests.codes.ok:
                 return True
-            else:
-                print ("{}-{}".format(e, address))
-                pass
         except Exception as e:
-            print ("{}-{}".format(e, address))
             return False
 
 class M3uItem:
@@ -56,7 +52,7 @@ class M3uItem:
                     self.tvg_id = re.search('tvg-id="(.*?)"', m3u_fields, re.IGNORECASE).group(1)
                 if (re.search('tvg-logo="(.*?)"', m3u_fields, re.IGNORECASE)) and (re.search('tvg-logo="(.*?)"', m3u_fields, re.IGNORECASE).group(1) != u'Logo N/A'):
                     self.tvg_logo = re.search('tvg-logo="(.*?)"', m3u_fields, re.IGNORECASE).group(1)
-                if (re.search('group-title="(.*?)"', m3u_fields, re.IGNORECASE)):
+                if (re.search('group-title="(.*?)"', m3u_fields, re.IGNORECASE) and (re.search('group-title="(.*?)"', m3u_fields, re.IGNORECASE).group(1) != u'Unsorted')):
                     self.group_title = re.search('group-title="(.*?)"', m3u_fields, re.IGNORECASE).group(1)
                 self.name = m3u_fields.split(",")[-1]
             except AttributeError as e:
@@ -138,7 +134,8 @@ def main():
     m3u_entries = filter_m3u_entries(args, m3u_entries)
 
     if m3u_entries is not None and len(m3u_entries) > 0:
-        m3u_entries = sort_m3u_entries(args, m3u_entries)
+#        m3u_entries = sort_m3u_entries(args, m3u_entries)
+        m3u_entries = fillfree_m3u_entries(m3u_entries)
 
         epg_filename = load_epg(args)
         if epg_filename is not None:
@@ -255,7 +252,7 @@ def save_original_m3u(out_directory, m3u_response):
 def parse_m3u(m3u_filename):
     output_str("parsing m3u into a list of objects")
     m3u_file = open(m3u_filename, 'r')
-    line = m3u_file.readline()
+    line = m3u_file.readline().strip()
     if not line.startswith('#EXTM3U'):
         return
 
@@ -280,7 +277,7 @@ def parse_m3u(m3u_filename):
     return m3u_entries
 
 def check_url_connect(url):
-    #output_str("Check URL for \"died\" link: "+url)
+    output_str("Check URL for \"died\" link: "+url)
     newcheck = check_link(url,None)
     return newcheck.check(url)
 
@@ -312,6 +309,18 @@ def filter_m3u_entries(args, m3u_entries):
     output_str("filtered m3u contains {} items".format(len(filtered_m3u_entries)))
     return filtered_m3u_entries
 
+
+# filters the given m3u_entries using the supplied groups
+def fillfree_m3u_entries(m3u_entries):
+    for m3u_entry in m3u_entries:
+        if m3u_entry.group_title == None:
+            if re.search('UA', m3u_entry): m3u_entry.group_title = u'UA'
+            if re.search('^US:', m3u_entry): m3u_entry.group_title = u'US'
+            if re.search('^USA:', m3u_entry): m3u_entry.group_title = u'US'
+            if re.search('^UK:', m3u_entry): m3u_entry.group_title = u'UK'
+
+    output_str("filled m3u contains {} items".format(len(m3u_entries)))
+    return m3u_entries
 
 # sorts the given m3u_entries using the supplied args.groups and args.sortchannels
 def sort_m3u_entries(args, m3u_entries):
