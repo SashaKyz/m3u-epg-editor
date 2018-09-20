@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import sys
 import os
 import argparse
@@ -15,7 +16,6 @@ import dateutil.parser
 import codecs
 from urllib import url2pathname
 import urllib2
-
 
 class check_link():
 
@@ -318,6 +318,9 @@ def fillfree_m3u_entries(m3u_entries):
             elif re.search('^US:', m3u_entry.name): m3u_entry.group_title = u'US'
             elif re.search('^USA:', m3u_entry.name): m3u_entry.group_title = u'US'
             elif re.search('^UK:', m3u_entry.name): m3u_entry.group_title = u'UK'
+            elif re.search('18+', m3u_entry.name): m3u_entry.group_title = u'Эротические'
+            elif re.search(u'Украина', m3u_entry.name): m3u_entry.group_title = u'UA'
+
 
     output_str("filled m3u contains {} items".format(len(m3u_entries)))
     return m3u_entries
@@ -353,7 +356,7 @@ def sort_m3u_entries(args, m3u_entries):
 def save_new_m3u(args, m3u_entries):
     if m3u_entries is not None:
         idx = 0
-        m3u_target = os.path.join(args.outdirectory, args.outfilename + ".m3u8")
+        m3u_target = os.path.join(args.outdirectory, args.outfilename + ".m3u")
         output_str("saving new m3u file: " + m3u_target)
         with codecs.open(m3u_target, "w",encoding="utf-8") as text_file:
             text_file.write("%s\n" % "#EXTM3U")
@@ -547,6 +550,8 @@ def save_new_epg(args, xml_tree):
     epg_target = os.path.join(args.outdirectory, args.outfilename + ".xml")
     output_str("saving new epg xml file: " + epg_target)
     xml_tree.write(epg_target, encoding="UTF-8", xml_declaration=True)
+    with open(epg_target, 'rb') as f_in, gzip.open(epg_target+'.gz', 'wb') as f_out:
+        shutil.copyfileobj(f_in, f_out)
 
 
 if __name__ == '__main__':
