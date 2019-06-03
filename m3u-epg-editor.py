@@ -131,11 +131,12 @@ arg_parser.add_argument('--outfilename', '-f', nargs='?', help='The output filen
 def main():
     args = validate_args()
     m3u_entries = load_m3u(args)
-    m3u_entries = filter_m3u_entries(args, m3u_entries)
+
 
     if m3u_entries is not None and len(m3u_entries) > 0:
 #        m3u_entries = sort_m3u_entries(args, m3u_entries)
         m3u_entries = fillfree_m3u_entries(m3u_entries)
+        m3u_entries = filter_m3u_entries(args, m3u_entries)
 
         epg_filename = load_epg(args)
         if epg_filename is not None:
@@ -221,7 +222,7 @@ def load_m3u(args):
     m3u_response = get_m3u(args.m3uurl)
     if m3u_response.status_code == 200:
         m3u_filename = save_original_m3u(args.outdirectory, m3u_response)
-        m3u_response.close()
+        #m3u_response.close()
         m3u_entries = parse_m3u(m3u_filename)
         return m3u_entries
     else:
@@ -281,6 +282,17 @@ def check_url_connect(url):
     newcheck = check_link(url,None)
     return newcheck.check(url)
 
+def check_m3u_entry_dup(m3u_entr,m3u_list):
+    max_fuzz = 0
+    for c_m3u_entry in m3u_list:
+        if (c_m3u_entry.url == m3u_entr.url):
+            return 100
+        curr_fuzz = fuzz.partial_token_sort_ratio(m3u_entr.name, c_m3u_entry.name, force_ascii=False)
+        if (curr_fuzz > max_fuzz):
+            max_fuzz = curr_fuzz
+    return max_fuzz
+
+
 def my_sort(seq):
     return list(k for k, _ in itertools.groupby(sorted(seq, key=lambda entry: entry.url)))
 
@@ -292,7 +304,6 @@ def filter_m3u_entries(args, m3u_entries):
 
     # sort the channels by name by default
     m3u_entries = my_sort(m3u_entries)
-
     filtered_m3u_entries = []
     all_channels_name_target = os.path.join(args.outdirectory, "original.channels.txt")
     filtered_channels_name_target = os.path.join(args.outdirectory, args.outfilename + ".channels.txt")
@@ -301,9 +312,10 @@ def filter_m3u_entries(args, m3u_entries):
             for m3u_entry in m3u_entries:
 #                if m3u_entry.group_title.lower() in args.groups and not m3u_entry.tvg_name.lower() in args.channels:
                 if check_url_connect(m3u_entry.url):
-                    filtered_m3u_entries.append(m3u_entry)
-                    filtered_channels_file.write(
-                        "'%s','%s'\n" % (m3u_entry.name, m3u_entry.group_title))
+                    if check_m3u_entry_dup(m3u_entry,filtered_m3u_entries) < 95:
+                        filtered_m3u_entries.append(m3u_entry)
+                        filtered_channels_file.write(
+                                        "'%s','%s'\n" % (m3u_entry.name, m3u_entry.group_title))
                 all_channels_file.write("'%s','%s'\n" % (m3u_entry.name, m3u_entry.group_title))
 
     output_str("filtered m3u contains {} items".format(len(filtered_m3u_entries)))
