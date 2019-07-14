@@ -290,6 +290,15 @@ def check_m3u_entry_dup(m3u_entr,m3u_list):
         curr_fuzz = fuzz.partial_token_sort_ratio(m3u_entr.name, c_m3u_entry.name, force_ascii=False)
         if (curr_fuzz > max_fuzz):
             max_fuzz = curr_fuzz
+        curr_fuzz = fuzz.partial_token_sort_ratio(m3u_entr.name, c_m3u_entry.tvg_name , force_ascii=False)
+        if (curr_fuzz > max_fuzz):
+            max_fuzz = curr_fuzz
+        curr_fuzz = fuzz.partial_token_sort_ratio(m3u_entr.tvg_name, c_m3u_entry.name , force_ascii=False)
+        if (curr_fuzz > max_fuzz):
+            max_fuzz = curr_fuzz
+        curr_fuzz = fuzz.partial_token_sort_ratio(m3u_entr.tvg_name, c_m3u_entry.tvg_name, force_ascii=False)
+        if (curr_fuzz > max_fuzz):
+            max_fuzz = curr_fuzz
     return max_fuzz
 
 
