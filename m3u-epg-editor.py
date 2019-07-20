@@ -27,10 +27,10 @@ class check_link():
         try:
 
             request = requests.get(url=address,timeout=self.timeout_check, stream=True)
-            if request.status_code in [400, 404, 403, 408, 409, 501, 502, 503]:
-                return  False
-            elif request.status_code == requests.codes.ok:
+            if request.status_code == requests.codes.ok:
                 return True
+            else:
+                return False
         except Exception as e:
             return False
 
@@ -278,9 +278,11 @@ def parse_m3u(m3u_filename):
     return m3u_entries
 
 def check_url_connect(url):
-    output_str("Check URL for \"died\" link: "+url)
+    status_url =False
     newcheck = check_link(url,None)
-    return newcheck.check(url)
+    status_url = newcheck.check(url)
+    output_str("Check URL for \"died\" link: "+url+" "+str(status_url))
+    return status_url
 
 def check_m3u_entry_dup(m3u_entr,m3u_list):
     max_fuzz = 0
@@ -339,7 +341,7 @@ def fillfree_m3u_entries(m3u_entries):
             elif re.search('^US:', m3u_entry.name): m3u_entry.group_title = u'US'
             elif re.search('^USA:', m3u_entry.name): m3u_entry.group_title = u'US'
             elif re.search('^UK:', m3u_entry.name): m3u_entry.group_title = u'UK'
-            elif re.search('18+', m3u_entry.name): m3u_entry.group_title = u'Эротические'
+            elif re.search('18+', m3u_entry.name): m3u_entry.group_title = u'18+'
             elif re.search(u'Украина', m3u_entry.name): m3u_entry.group_title = u'UA'
 
 
