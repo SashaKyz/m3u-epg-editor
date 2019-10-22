@@ -278,10 +278,12 @@ def parse_m3u(m3u_filename):
     return m3u_entries
 
 def check_url_connect(url):
-    status_url =False
-    newcheck = check_link(url,None)
-    status_url = newcheck.check(url)
-    output_str("Check URL for \"died\" link: "+url+" "+str(status_url))
+    # status_url =False
+    # TODO
+    status_url = True
+    # newcheck = check_link(url,None)
+    # status_url = newcheck.check(url)
+    # output_str("Check URL for \"died\" link: "+url+" "+str(status_url))
     return status_url
 
 def check_m3u_entry_dup(m3u_entr,m3u_list):
@@ -343,6 +345,8 @@ def fillfree_m3u_entries(m3u_entries):
             elif re.search('^UK:', m3u_entry.name): m3u_entry.group_title = u'UK'
             elif re.search('18+', m3u_entry.name): m3u_entry.group_title = u'18+'
             elif re.search(u'Украина', m3u_entry.name): m3u_entry.group_title = u'UA'
+            elif re.search(u'Music', m3u_entry.name): m3u_entry.group_title = u'Music'
+            else: m3u_entry.group_title = u'Общие'
 
 
     output_str("filled m3u contains {} items".format(len(m3u_entries)))
@@ -490,21 +494,37 @@ def create_new_epg(args, original_epg_filename, m3u_entries):
     new_root.set("source-info-name", "py-m3u-epg-editor")
     new_root.set("generator-info-name", "py-m3u-epg-editor")
     new_root.set("generator-info-url", "py-m3u-epg-editor")
+    channel_name_dict = dict()
+    channel_logo_dict = dict()
+
+    # TODO Fix algoritm to have scope of display-name
 
     for channel in original_root.findall('channel'):  # type: object
-        channel_display_name = channel.find('display-name').text
         channel_id = channel.get("id")
-        for x in m3u_entries :
-            ratio_fuzz = fuzz.partial_token_sort_ratio(x.name, channel_display_name,force_ascii=False)
-            if  ( ratio_fuzz > 97):
+        channel_logo = channel.get("icon")
+        channel_display_name = channel.findall('display-name')
+        for channel_name in channel_display_name:
+            if channel_name.text is None:
+                continue
+            else:
+                channel_name_as_text = channel_name.text.encode('utf-8')
+                channel_name_dict[channel_name_as_text] = channel_id
+                channel_logo_dict[channel_name_as_text] = channel_logo
+
+    output_str("Dict created.")
+    for x in m3u_entries:
+        #output_str("Checking {}".format(x.name.strip()))
+        for item_dict in channel_name_dict.keys():
+            ratio_fuzz = fuzz.partial_token_sort_ratio( item_dict.decode('utf-8'), x.name.strip(), force_ascii=False)
+            if ( ratio_fuzz > 97):
                 #output_str("Updating channel element for {}".format(channel_display_name).encode('utf-8'))
+                x.tvg_id = channel_name_dict[item_dict]
+                x.tvg_name = item_dict
+                if not(channel_logo_dict[item_dict] is None):
+                    x.tvg_logo=channel_logo_dict[item_dict]
+                break
 
-                if isinstance(channel_id,unicode):
-                    x.tvg_id = channel_id
-                else:
-                    x.tvg_id = channel_id.decode('utf-8')
-
-                x.tvg_name = channel_display_name
+    output_str("Dict created2 .")
 
     # create a channel element for every channel present in the m3u
     for channel in original_root.iter('channel'):
