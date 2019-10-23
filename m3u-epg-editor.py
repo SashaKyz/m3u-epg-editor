@@ -1,21 +1,25 @@
 # -*- coding: utf-8 -*-
-import sys
-import os
 import argparse
 import ast
-import requests
+import codecs
+import datetime
+import gzip
 import itertools
+import os
 import re
 import shutil
-import gzip
-from xml.etree.cElementTree import Element, SubElement, parse, ElementTree
-import datetime
-import unicodedata
-from fuzzywuzzy import fuzz
-import dateutil.parser
-import codecs
+import sys
 from urllib import url2pathname
-import urllib2
+from xml.etree.cElementTree import Element, SubElement, parse, ElementTree
+
+import dateutil.parser
+import requests
+from fuzzywuzzy import fuzz
+
+import sys
+reload(sys)
+sys.setdefaultencoding('utf-8')
+
 
 class check_link():
 
@@ -211,7 +215,7 @@ def output_str(event_str):
         print("%s %s" % (datetime.datetime.now().isoformat(), event_str))
     except IOError as e:
         if e.errno != 0:
-            print "I/O error({0}): {1} for event string '{2}'".format(e.errno, e.strerror, event_str)
+            print("I/O error({0}): {1} for event string '{2}'".format(e.errno, e.strerror, event_str))
 
 
 ########################################################################################################################
@@ -254,8 +258,10 @@ def parse_m3u(m3u_filename):
     output_str("parsing m3u into a list of objects")
     m3u_file = open(m3u_filename, 'r')
     line = m3u_file.readline().strip()
-    if not line.startswith('#EXTM3U'):
-        return
+#TODO We have to fix this EXTM3U
+    if not line.startswith(str("#EXTM3U")):
+        print (line)
+
 
     m3u_entries = []
     entry = M3uItem(None)
@@ -415,7 +421,7 @@ def load_epg(args):
     if epg_response.status_code == 200:
         is_gzipped = args.epgurl.lower().endswith(".gz")
         epg_filename = save_original_epg(is_gzipped, args.outdirectory, epg_response)
-        epg_response.close()
+        #epg_response.close()
         if is_gzipped:
             epg_filename = extract_original_epg(args.outdirectory, epg_filename)
         return epg_filename
@@ -515,8 +521,8 @@ def create_new_epg(args, original_epg_filename, m3u_entries):
     for x in m3u_entries:
         #output_str("Checking {}".format(x.name.strip()))
         for item_dict in channel_name_dict.keys():
-            ratio_fuzz = fuzz.partial_token_sort_ratio( item_dict.decode('utf-8'), x.name.strip(), force_ascii=False)
-            if ( ratio_fuzz > 97):
+            ratio_fuzz = fuzz.token_sort_ratio( item_dict.decode('utf-8'), x.name.strip(), force_ascii=False)
+            if ( ratio_fuzz > 80):
                 #output_str("Updating channel element for {}".format(channel_display_name).encode('utf-8'))
                 x.tvg_id = channel_name_dict[item_dict]
                 x.tvg_name = item_dict
